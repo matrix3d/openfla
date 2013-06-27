@@ -10,6 +10,12 @@ public class XMLTreeNode {
 		this.node=node;
 	}
 	public String toString(){
-		return node.getNodeName();
+		String nodeName=node.getNodeName();
+		if(nodeName=="DOMBitmapItem"){
+			return node.getAttributes().getNamedItem("name").getNodeValue();
+		}else if(nodeName=="Include"){
+			return node.getAttributes().getNamedItem("href").getNodeValue();
+		}
+		return nodeName;
 	}
 }
