@@ -10,6 +10,9 @@ import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathExpression;
+import javax.xml.xpath.XPathFactory;
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.dnd.DnDConstants;
@@ -18,8 +21,11 @@ import java.awt.dnd.DropTargetAdapter;
 import java.awt.dnd.DropTargetDropEvent;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Created with IntelliJ IDEA.
@@ -29,6 +35,8 @@ public class View extends JFrame {
 	private JTree tree;
 	private World sprite;
 	private File currentFile;
+	private Map<String,Node> symbols;
+	private Map<String,XMLImage> bitmaps;
 	public View() {
 		super("openfla");
 		JMenuBar menuBar = new JMenuBar();
@@ -93,36 +101,108 @@ public class View extends JFrame {
 		});
 	}
 
-	private void show(Node node){
+	private String getHrefUrl(Node node){
+		String url=node.getAttributes().getNamedItem("href").getNodeValue();
+		url=url.replace("/",File.separator);
+		url=currentFile.getParent()+File.separator+"LIBRARY"+File.separator+url;
+		return url;
+	}
+
+	private BufferedImage getImage(String name){
+		XMLImage xi=bitmaps.get(name);
+		if(xi==null){
+			return  null;
+		}
+		if(xi.image!=null){
+			return xi.image;
+		}
+		try {
+			File file=new File(getHrefUrl(xi.node));
+			xi.image=ImageIO.read(file);
+		} catch (IOException e) {
+			e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+		}
+		return xi.image;
+	}
+
+	private void show(XMLTreeNode treeNode){
+		Node node =treeNode.node;
 		if(node!=null&&node.getNodeName()=="DOMBitmapItem"){
-			String url=node.getAttributes().getNamedItem("sourceExternalFilepath").getNodeValue();
-			url=url.substring(2);
-			url=url.replace("/",File.separator);
-			url=currentFile.getParent()+File.separator+url;
-			File file=new File(url);
-			if(file.exists()){
 				sprite.root.children.clear();
 				Bitmap bmp=new Bitmap();
-				try {
-					bmp.image=ImageIO.read(file);
-				} catch (IOException e) {
-					e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
-				}
+				bmp.image=getImage(node.getAttributes().getNamedItem("name").getNodeValue());
+
 				sprite.root.add(bmp);
 				sprite.repaint();
+		}else if(node!=null&&node.getNodeName()=="Include"){
+			sprite.root.children.clear();
+			sprite.root.add(getMC(treeNode.symbolName));
+			sprite.repaint();
+		}
+	}
+
+	private Sprite getMC(String name){
+		Sprite sprite1 = new Sprite();
+		Node node = symbols.get(name);
+		if(node!=null){
+			Document doc=(Document)node;
+			NodeList layers= doc.getElementsByTagName("DOMLayer");
+			for (int i=0;i<layers.getLength();i++){
+				Node layer =layers.item(i);
+				NodeList frames = layer.getChildNodes();
+				for(int j=0;j<frames.getLength();j++){
+					Node frame = frames.item(j);
+					if(frame.getNodeName()=="frames"){
+						NodeList DOMFrames=frame.getChildNodes();
+						for(int k=0;k<DOMFrames.getLength();k++){
+							Node DOMFrame=DOMFrames.item(k);
+							if(DOMFrame.getNodeName()=="DOMFrame"){
+								NodeList elements=DOMFrame.getChildNodes();
+								for(int a=0;a<elements.getLength();a++){
+									Node element=elements.item(a);
+									if(element.getNodeName()=="elements"){
+										NodeList domInstances=element.getChildNodes();
+										for(int b=0;b<domInstances.getLength();b++){
+											Node instance=domInstances.item(b);
+											if(instance.getNodeName()=="DOMBitmapInstance"){
+												Bitmap bitmap=new Bitmap();
+												bitmap.image=getImage(instance.getAttributes().getNamedItem("libraryItemName").getNodeValue());
+												sprite1.add(bitmap);
+											}else if(instance.getNodeName()=="DOMSymbolInstance"){
+												sprite1.add(getMC(instance.getAttributes().getNamedItem("libraryItemName").getNodeValue()));
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
 			}
 		}
+		return  sprite1;
+	}
 
+	private Document getDoc(File file){
+		try{
+			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+			DocumentBuilder builder = factory.newDocumentBuilder();
+			Document doc = builder.parse(file);
+			return doc;
+		}catch (Exception e){
+			e.printStackTrace();
+		}
+		return null;
 	}
 
 	private void openXFLFile(File file){
-		try{
+
 			File dom = new File(file.getParent()+File.separator+"DOMDocument.xml");
 			currentFile=file;
 			if(dom.exists()){
-				DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-				DocumentBuilder builder = factory.newDocumentBuilder();
-				Document doc = builder.parse(dom);
+				Document doc=getDoc(dom);
+				symbols=new HashMap<String, Node>();
+				bitmaps =new HashMap<String, XMLImage>();
 				Container parent = tree.getParent();
 				parent.remove(tree);
 				tree=new JTree(doXml(doc));
@@ -131,20 +211,35 @@ public class View extends JFrame {
 					public void valueChanged(TreeSelectionEvent e) {
 						DefaultMutableTreeNode treeNode =(DefaultMutableTreeNode)(e.getPath().getLastPathComponent());
 						XMLTreeNode xmlTreeNode=(XMLTreeNode)treeNode.getUserObject();
-						show(xmlTreeNode.node);
+						show(xmlTreeNode);
 					}
 				});
 				parent.add(tree);
 			}
-
-		}catch (Exception e){
-			e.printStackTrace();
-		}
 	}
 
 	private DefaultMutableTreeNode doXml(Node node){
 		NodeList list = node.getChildNodes();
-		DefaultMutableTreeNode tnode=new DefaultMutableTreeNode(new XMLTreeNode(node));
+		XMLTreeNode xt=new XMLTreeNode(node);
+		DefaultMutableTreeNode tnode=new DefaultMutableTreeNode(xt);
+		if(node.getNodeName()=="Include"){
+			File file =new File(getHrefUrl(node));
+			Document doc=getDoc(file);
+			XPathFactory factoryXpah = XPathFactory.newInstance();
+			XPath xpath = factoryXpah.newXPath();
+			try{
+				XPathExpression snameXP = xpath.compile("DOMSymbolItem/@name");
+				String sname=snameXP.evaluate(doc);
+				xt.symbolName=sname;
+				symbols.put(sname,doc);
+			}catch (Exception e){
+
+			}
+		}else if(node.getNodeName()=="DOMBitmapItem"){
+			XMLImage xmlImage=new XMLImage();
+			xmlImage.node=node;
+			bitmaps.put(node.getAttributes().getNamedItem("name").getNodeValue(),xmlImage);
+		}
 		for(int i=0;i<list.getLength();i++){
 			Node cnode = list.item(i);
 			if(cnode.getNodeType()==Node.TEXT_NODE){

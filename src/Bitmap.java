@@ -1,5 +1,6 @@
 import javax.swing.*;
 import java.awt.*;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 
 /**
@@ -10,8 +11,9 @@ public class Bitmap extends Sprite {
 	public BufferedImage image;
 	public void render(Graphics2D g,World world){
 		if(image!=null){
+			super.doTransorm(g);
 			g.drawImage(image,0,0,world);
 		}
-		super.render(g,world);
+		super.renderChild(g,world);
 	}
 }

@@ -6,6 +6,7 @@ import org.w3c.dom.Node;
  */
 public class XMLTreeNode {
 	public Node node;
+	public String symbolName;
 	public XMLTreeNode(Node node){
 		this.node=node;
 	}
