@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/openJXREditor.iml" filepath="$PROJECT_DIR$/openJXREditor.iml" />
+      <module fileurl="file://$PROJECT_DIR$/openfla.iml" filepath="$PROJECT_DIR$/openfla.iml" />
     </modules>
   </component>
 </project>

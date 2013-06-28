@@ -1,5 +1,6 @@
 
 import org.w3c.dom.Document;
+import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
@@ -21,6 +22,7 @@ import java.awt.dnd.DropTargetAdapter;
 import java.awt.dnd.DropTargetDropEvent;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -147,7 +149,7 @@ public class View extends JFrame {
 		if(node!=null){
 			Document doc=(Document)node;
 			NodeList layers= doc.getElementsByTagName("DOMLayer");
-			for (int i=0;i<layers.getLength();i++){
+			for (int i=layers.getLength()-1;i>=0;i--){
 				Node layer =layers.item(i);
 				NodeList frames = layer.getChildNodes();
 				for(int j=0;j<frames.getLength();j++){
@@ -167,13 +169,17 @@ public class View extends JFrame {
 											if(instance.getNodeName()=="DOMBitmapInstance"){
 												Bitmap bitmap=new Bitmap();
 												bitmap.image=getImage(instance.getAttributes().getNamedItem("libraryItemName").getNodeValue());
+												bitmap.transform=getMatrix(instance);
 												sprite1.add(bitmap);
 											}else if(instance.getNodeName()=="DOMSymbolInstance"){
-												sprite1.add(getMC(instance.getAttributes().getNamedItem("libraryItemName").getNodeValue()));
+												Sprite mc=getMC(instance.getAttributes().getNamedItem("libraryItemName").getNodeValue());
+												mc.transform=getMatrix(instance);
+												sprite1.add(mc);
 											}
 										}
 									}
 								}
+								break;
 							}
 						}
 					}
@@ -181,6 +187,39 @@ public class View extends JFrame {
 			}
 		}
 		return  sprite1;
+	}
+
+	private AffineTransform getMatrix(Node node){
+		NodeList list =node.getChildNodes();
+
+		float[] floats= {1f,0f,0f,1f,0f,0f};
+		for(int i=0;i<list.getLength();i++){
+			Node matr=list.item(i);
+			if(matr.getNodeName()=="matrix"){
+				NodeList ms=matr.getChildNodes();
+				for(int j=0;j<ms.getLength();j++){
+					Node m=ms.item(j);
+					if(m.getNodeName()=="Matrix"){
+						NamedNodeMap att=m.getAttributes();
+						if(att.getNamedItem("a")!=null){
+							floats[0]=Float.parseFloat(att.getNamedItem("a").getNodeValue());
+						}if(att.getNamedItem("b")!=null){
+							floats[1]=Float.parseFloat(att.getNamedItem("b").getNodeValue());
+						}if(att.getNamedItem("c")!=null){
+							floats[2]=Float.parseFloat(att.getNamedItem("c").getNodeValue());
+						}if(att.getNamedItem("d")!=null){
+							floats[3]=Float.parseFloat(att.getNamedItem("d").getNodeValue());
+						}if(att.getNamedItem("tx")!=null){
+							floats[4]=Float.parseFloat(att.getNamedItem("tx").getNodeValue());
+						}if(att.getNamedItem("ty")!=null){
+							floats[5]=Float.parseFloat(att.getNamedItem("ty").getNodeValue());
+						}
+						break;
+					}
+				}
+			}
+		}
+		return  new AffineTransform(floats);
 	}
 
 	private Document getDoc(File file){

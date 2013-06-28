@@ -23,10 +23,10 @@ public class Sprite{
 	}
 
 	public void doTransorm(Graphics2D g){
-		transform=new AffineTransform();
-		transform.scale(scaleX,scaleY);
-		transform.rotate(rotation);
-		transform.translate(x,y);
+		//transform=new AffineTransform();
+		//transform.scale(scaleX,scaleY);
+		//transform.rotate(rotation);
+		//transform.translate(x,y);
 		if(parent!=null){
 			transform.concatenate(parent.transform);
 		}
